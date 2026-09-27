@@ -9,6 +9,8 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 
 from sumula_salao import processar_sumula
 
+APP_BUILD = "2026-09-27-path-local-import"
+
 
 # =========================================================
 # CONFIGURACOES
@@ -28,7 +30,8 @@ app = FastAPI(
 def home():
     return {
         "sucesso": True,
-        "servico": "API Sumulas"
+        "servico": "API Sumulas",
+        "build": APP_BUILD
     }
 
 

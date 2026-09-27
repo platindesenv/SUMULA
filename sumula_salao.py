@@ -821,7 +821,9 @@ def processar_sumula(pdf_file, nome_arquivo=None):
     O arquivo PDF recebido deve existir apenas durante o processamento.
     """
 
-    pdf_file = Path(pdf_file)
+    from pathlib import Path as LocalPath
+
+    pdf_file = LocalPath(pdf_file)
 
     if not pdf_file.exists():
         raise FileNotFoundError(
@@ -1033,4 +1035,3 @@ def processar_sumula(pdf_file, nome_arquivo=None):
     }
 
     return dados
-
