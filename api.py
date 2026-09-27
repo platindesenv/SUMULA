@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+import asyncio
 import tempfile
 import time
 import uuid
@@ -13,6 +14,9 @@ from fastapi.concurrency import run_in_threadpool
 from sumula_salao import processar_sumula
 
 APP_BUILD = "2026-09-27-path-local-import"
+PROCESS_TIMEOUT_SECONDS = float(
+    os.getenv("PROCESS_TIMEOUT_SECONDS", "25")
+)
 
 import logging
 
@@ -129,10 +133,13 @@ async def processar_sumula_salao(
             nome_pdf
         )
 
-        resultado = await run_in_threadpool(
-            processar_sumula,
-            caminho_temp,
-            nome_arquivo=nome_pdf
+        resultado = await asyncio.wait_for(
+            run_in_threadpool(
+                processar_sumula,
+                caminho_temp,
+                nome_arquivo=nome_pdf
+            ),
+            timeout=PROCESS_TIMEOUT_SECONDS
         )
 
         logger.info(
@@ -154,6 +161,27 @@ async def processar_sumula_salao(
 
     except HTTPException:
         raise
+
+    except asyncio.TimeoutError:
+        duracao = time.monotonic() - inicio
+        logger.error(
+            "[%s] Timeout ao processar sumula apos %.2fs: arquivo=%s limite=%.2fs",
+            request_id,
+            duracao,
+            nome_pdf if "nome_pdf" in locals() else arquivo.filename,
+            PROCESS_TIMEOUT_SECONDS
+        )
+
+        raise HTTPException(
+            status_code=504,
+            detail={
+                "erro": "Tempo limite ao processar a sumula.",
+                "request_id": request_id,
+                "timeout_segundos": PROCESS_TIMEOUT_SECONDS,
+                "duracao_segundos": round(duracao, 2),
+                "arquivo": nome_pdf if "nome_pdf" in locals() else arquivo.filename
+            }
+        )
 
     except Exception as erro:
         logger.exception(
