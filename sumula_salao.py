@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import gc
 import json
 import re
 import unicodedata
@@ -792,22 +793,19 @@ def parse_team_block(items, team_name, title_item):
     }
     
     
-# =========================================================
-# EXECUCAO DO DOCLING
-# =========================================================
+def criar_converter_docling():
+    pipeline_options = PdfPipelineOptions(
+        do_ocr=False,
+        do_table_structure=False
+    )
 
-pipeline_options = PdfPipelineOptions(
-    do_ocr=False,
-    do_table_structure=False
-)
-
-converter = DocumentConverter(
-    format_options={
-        InputFormat.PDF: PdfFormatOption(
-            pipeline_options=pipeline_options
-        )
-    }
-)
+    return DocumentConverter(
+        format_options={
+            InputFormat.PDF: PdfFormatOption(
+                pipeline_options=pipeline_options
+            )
+        }
+    )
 
 # =========================================================
 # PROCESSAR UMA SUMULA
@@ -834,8 +832,17 @@ def processar_sumula(pdf_file, nome_arquivo=None):
     # CONVERTE PDF
     # =====================================================
 
-    result = converter.convert(str(pdf_file))
-    items = extract_items_from_doc(result)
+    converter = None
+    result = None
+
+    try:
+        converter = criar_converter_docling()
+        result = converter.convert(str(pdf_file))
+        items = extract_items_from_doc(result)
+    finally:
+        del result
+        del converter
+        gc.collect()
 
     # =====================================================
     # CABECALHO
