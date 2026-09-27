@@ -2,14 +2,22 @@
 
 import os
 import tempfile
+import time
+import uuid
 
 from pathlib import Path
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.concurrency import run_in_threadpool
 
 from sumula_salao import processar_sumula
 
 APP_BUILD = "2026-09-27-path-local-import"
+
+import logging
+
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
+logger = logging.getLogger("api_sumulas")
 
 
 # =========================================================
@@ -44,6 +52,8 @@ async def processar_sumula_salao(
     arquivo: UploadFile = File(...)
 ):
     caminho_temp = None
+    inicio = time.monotonic()
+    request_id = uuid.uuid4().hex[:8]
 
     try:
         # =================================================
@@ -75,6 +85,12 @@ async def processar_sumula_salao(
         # =================================================
 
         conteudo = await arquivo.read()
+        logger.info(
+            "[%s] PDF recebido: nome=%s tamanho=%s bytes",
+            request_id,
+            arquivo.filename,
+            len(conteudo)
+        )
 
         if not conteudo:
             raise HTTPException(
@@ -107,9 +123,23 @@ async def processar_sumula_salao(
         # PROCESSA DIRETAMENTE
         # =================================================
 
-        resultado = processar_sumula(
+        logger.info(
+            "[%s] Iniciando processamento Docling: arquivo=%s",
+            request_id,
+            nome_pdf
+        )
+
+        resultado = await run_in_threadpool(
+            processar_sumula,
             caminho_temp,
             nome_arquivo=nome_pdf
+        )
+
+        logger.info(
+            "[%s] Processamento concluido em %.2fs: arquivo=%s",
+            request_id,
+            time.monotonic() - inicio,
+            nome_pdf
         )
 
         # =================================================
@@ -126,6 +156,12 @@ async def processar_sumula_salao(
         raise
 
     except Exception as erro:
+        logger.exception(
+            "[%s] Erro ao processar sumula apos %.2fs",
+            request_id,
+            time.monotonic() - inicio
+        )
+
         raise HTTPException(
             status_code=500,
             detail={
